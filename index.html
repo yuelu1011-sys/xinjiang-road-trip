@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新疆伊犁7天自驾路书</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f0e8; }
+
+.container { display: flex; height: 100vh; }
+
+/* 左侧面板 */
+.sidebar {
+  width: 380px; min-width: 380px;
+  background: #fff;
+  box-shadow: 2px 0 20px rgba(0,0,0,0.08);
+  display: flex; flex-direction: column;
+  z-index: 10;
+}
+
+.header {
+  padding: 24px 24px 16px;
+  background: linear-gradient(135deg, #3d7a5a, #2a7b8e);
+  color: #fff;
+}
+.header h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.header p { font-size: 13px; opacity: 0.8; }
+
+.day-tabs {
+  display: flex; flex-wrap: wrap;
+  padding: 12px 16px 8px;
+  gap: 6px;
+  border-bottom: 1px solid #eee;
+}
+.day-tab {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer;
+  border: 2px solid #e0e0e0;
+  background: #fff;
+  color: #666;
+  transition: all 0.3s;
+}
+.day-tab:hover { border-color: #aaa; }
+.day-tab.active { color: #fff; border-color: transparent; }
+
+.day-detail {
+  flex: 1; overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.route-header {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 12px;
+}
+.route-badge {
+  padding: 4px 12px; border-radius: 12px;
+  color: #fff; font-size: 11px; font-weight: 700;
+}
+.route-title { font-size: 16px; font-weight: 700; color: #2d2d2d; }
+
+.route-meta {
+  display: flex; gap: 16px;
+  margin-bottom: 16px;
+  font-size: 12px; color: #999;
+}
+.route-meta span { display: flex; align-items: center; gap: 4px; }
+
+/* 时间线 */
+.timeline { position: relative; padding-left: 20px; }
+.timeline::before {
+  content: ''; position: absolute; left: 5px; top: 8px; bottom: 8px;
+  width: 2px; background: #e8e8e8;
+}
+.tl-item {
+  position: relative; margin-bottom: 14px;
+  padding-left: 16px;
+}
+.tl-dot {
+  position: absolute; left: -20px; top: 4px;
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid; background: #fff;
+}
+.tl-time { font-size: 11px; font-weight: 700; margin-bottom: 2px; }
+.tl-text { font-size: 13px; color: #2d2d2d; }
+.tl-note { font-size: 11px; color: #aaa; margin-top: 1px; }
+
+/* 信息卡片 */
+.info-card {
+  margin-top: 14px; padding: 12px 14px;
+  border-radius: 10px; border-left: 3px solid;
+}
+.info-card h4 { font-size: 13px; margin-bottom: 6px; }
+.info-card p, .info-card li { font-size: 12px; color: #666; line-height: 1.7; }
+.info-card ul { padding-left: 16px; }
+.info-card.hotel { background: #f0f7f3; border-color: #3d7a5a; }
+.info-card.hotel h4 { color: #3d7a5a; }
+.info-card.food { background: #fdf0e8; border-color: #d88a6a; }
+.info-card.food h4 { color: #d88a6a; }
+.info-card.tips { background: #e6f2f5; border-color: #2a7b8e; }
+.info-card.tips h4 { color: #2a7b8e; }
+
+/* 全程按钮 */
+.btn-all {
+  margin: 12px 20px; padding: 10px;
+  background: linear-gradient(135deg, #3d7a5a, #2a7b8e);
+  color: #fff; border: none; border-radius: 8px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: opacity 0.3s;
+}
+.btn-all:hover { opacity: 0.9; }
+
+/* 地图 */
+.map-wrap { flex: 1; position: relative; }
+#map { width: 100%; height: 100%; }
+
+/* 地图上的标签 */
+.city-label {
+  background: none; border: none; box-shadow: none;
+  font-size: 12px; font-weight: 700; color: #2d2d2d;
+  text-shadow: 0 0 4px #fff, 0 0 4px #fff, 0 0 4px #fff;
+  white-space: nowrap;
+}
+.city-label-active { color: #3d7a5a; font-size: 13px; }
+
+/* 图例 */
+.legend {
+  position: absolute; bottom: 24px; right: 24px;
+  background: rgba(255,255,255,0.95); padding: 14px 18px;
+  border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  z-index: 1000; font-size: 12px;
+}
+.legend h4 { margin-bottom: 8px; font-size: 13px; color: #333; }
+.legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.legend-line { width: 24px; height: 3px; border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="sidebar">
+    <div class="header">
+      <h1>🏔️ 五一新疆伊犁 7天自驾路书</h1>
+      <p>2026.5.1 - 5.7 ｜ 自驾约950公里 ｜ 点击天数查看路线</p>
+    </div>
+    <div class="day-tabs" id="dayTabs"></div>
+    <button class="btn-all" id="btnAll">🗺️ 查看全程路线</button>
+    <div class="day-detail" id="dayDetail"></div>
+  </div>
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="legend">
+      <h4>图例</h4>
+      <div class="legend-item"><div class="legend-line" style="background:#d88a6a"></div>DAY 1/5</div>
+      <div class="legend-item"><div class="legend-line" style="background:#2a7b8e"></div>DAY 2/6</div>
+      <div class="legend-item"><div class="legend-line" style="background:#3d7a5a"></div>DAY 3/7</div>
+      <div class="legend-item"><div class="legend-line" style="background:#c49a3c"></div>DAY 4</div>
+      <div class="legend-item"><div class="legend-line" style="background:#999;border-top:2px dashed #999;height:0"></div>高铁/飞行</div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+// ── 数据 ──
+const COLORS = ['#d88a6a','#2a7b8e','#3d7a5a','#c49a3c','#d88a6a','#2a7b8e','#3d7a5a'];
+
+const cities = {
+  beijing:    { name: '北京', lat: 39.9042, lng: 116.4074 },
+  urumqi:     { name: '乌鲁木齐', lat: 43.8256, lng: 87.6168 },
+  yining:     { name: '伊宁', lat: 43.9128, lng: 81.3298 },
+  kazanqi:    { name: '喀赞其', lat: 43.9180, lng: 81.3150 },
+  liuxing:    { name: '六星街', lat: 43.9220, lng: 81.3050 },
+  gongliu:    { name: '巩留县', lat: 43.4836, lng: 82.2316 },
+  xinyuan:    { name: '新源县', lat: 43.4331, lng: 83.2608 },
+  nalati:     { name: '那拉提', lat: 43.3167, lng: 84.0167 },
+  chabuqihai: { name: '恰布其海', lat: 43.3500, lng: 82.9000 },
+  kuerdening: { name: '库尔德宁', lat: 43.1667, lng: 82.6000 },
+  tekesi:     { name: '特克斯', lat: 43.2181, lng: 81.8369 },
+  sayram:     { name: '赛里木湖', lat: 44.6000, lng: 81.1700 },
+  bole:       { name: '博乐机场', lat: 44.8955, lng: 82.0667 },
+};
+
+const days = [
+  {
+    day: 'DAY 1', date: '5月1日 周四', title: '北京 ✈ 乌鲁木齐',
+    subtitle: 'MU9851 · 国际大巴扎', dist: 'MU9851 14:35-18:55', color: COLORS[0],
+    route: ['urumqi'],
+    flyFrom: 'beijing',
+    schedule: [
+      { time: '14:35', text: '北京出发 MU9851', note: '东航直飞，约 4 小时 20 分钟' },
+      { time: '18:55', text: '抵达乌鲁木齐地窝堡机场', note: '新疆与北京有约 2 小时时差，天还亮' },
+      { time: '19:20', text: '机场打车前往酒店', note: '约 10 公里，20 分钟' },
+      { time: '19:40', text: '入住弗洛拉酒店', note: '放行李、稍作休整' },
+      { time: '20:00', text: '打车前往国际大巴扎', note: '距酒店约 2.5 公里，打车 8 分钟' },
+      { time: '20:00', text: '逛大巴扎 + 美食街晚餐', note: '步行街拍夜景、登塔楼、逛购物区' },
+      { time: '22:00', text: '步行前往和田二街夜市', note: '距大巴扎约 1 公里，步行 10 分钟' },
+      { time: '22:00', text: '逛和田二街 + 宵夜', note: '比大巴扎更本地，烟火气十足，营业到凌晨' },
+      { time: '00:00', text: '打车返回酒店休息', note: '明天上午高铁，睡到自然醒' },
+    ],
+    hotel: { name: '弗洛拉酒店', addr: '乌鲁木齐市天山区龙泉街349号新疆民街5号楼', price: '约300-400元/晚' },
+    food: [
+      ['红柳烤肉', '大巴扎宴艺美食街，红柳枝串的羊肉串，肉嫩多汁，10-15元/串'],
+      ['新疆拌面', '大巴扎附近「阿布拉的馕」，拌面+馕套餐，到新疆第一顿必吃'],
+      ['烤包子', '大巴扎美食街随处可见，推荐「努尔兰烤包子」，皮脆馅香'],
+      ['鲜榨石榴汁', '大巴扎步行街上的鲜榨摊位，10元一杯，酸甜解腻'],
+      ['酸奶粽子', '大巴扎特色甜品，「古丽的酸奶粽子」摊位人气最高'],
+      ['馕', '「阿布拉的馕」芝麻馕、玫瑰花馕，买几个路上当零食'],
+      ['和田二街烤蛋', '和田二街入口处摊位，鸡蛋烤到焦香撒孜然，2元/个'],
+      ['羊头肉', '和田二街「老艾力羊头肉」，卤煮羊头切片蘸椒盐'],
+      ['烤鸽子', '和田二街人气摊位，外酥里嫩，15-20元/只'],
+    ],
+    tips: [
+      ['必逛：大巴扎步行街', '从正门进入，中轴步行街两侧是伊斯兰风格建筑群，拍照绝佳，夜景灯光更美'],
+      ['必逛：大巴扎美食街', '步行街尽头左转进入美食街/夜市区，各种烤肉、小吃集中，边走边吃'],
+      ['必逛：大巴扎塔楼', '80米高的观光塔，可以俯瞰整个大巴扎和周边城区，门票约30元'],
+      ['必打卡：宴艺大巴扎', '大巴扎内的网红餐厅，有新疆歌舞表演+自助餐，边吃边看演出，人均约150-200元，建议提前订座'],
+      ['购物区', '1楼干果区（巴旦木、葡萄干记得砍价，一般对半砍）、2楼丝巾围巾区、3楼手工艺品区'],
+      ['必逛：和田二街', '距大巴扎步行约10分钟，比大巴扎更接地气，本地人也爱去的夜市，烟火气拉满'],
+      ['和田二街攻略', '整条街都是露天摊位，烤蛋、烤鸽子、羊头肉是特色，价格比大巴扎便宜'],
+      ['建议路线', '先逛大巴扎（拍照+购物）→ 再去和田二街（宵夜），两个地方风格完全不同'],
+      ['时差提醒', '新疆比北京晚约2小时，凌晨12点体感才像北京的22点，夜市正热闹'],
+    ],
+  },
+  {
+    day: 'DAY 2', date: '5月2日 周五', title: '乌鲁木齐 🚄 伊宁',
+    subtitle: 'C845 高铁 · 伊宁 Citywalk', dist: 'C845 10:05发车', color: COLORS[1],
+    route: ['urumqi', 'yining', 'kazanqi', 'liuxing'],
+    trainRoute: ['urumqi', 'yining'],
+    schedule: [
+      { time: '08:30', text: '退房，打车前往乌鲁木齐站', note: '预留充足时间安检进站' },
+      { time: '10:05', text: '高铁 C845 出发', note: '约 5.5 小时，沿途可看天山风光' },
+      { time: '15:30', text: '抵达伊宁站', note: '' },
+      { time: '16:00', text: '打车到酒店，放行李', note: '伊宁站 → 酒店约 10 公里，20 分钟' },
+      { time: '16:30', text: 'Citywalk 起点：喀赞其民俗旅游区', note: '蓝色小巷、彩色木门、马车巡游' },
+      { time: '18:30', text: '步行至六星街', note: '喀赞其南门出，沿解放路向西约 1.5 公里' },
+      { time: '18:30', text: '逛六星街 + 晚餐', note: '俄式建筑、手风琴、手工冰淇淋' },
+      { time: '20:00', text: '步行至伊犁河大桥', note: '六星街向南约 2 公里，沿途经过汉人街' },
+      { time: '20:00', text: '伊犁河大桥看日落', note: '五月日落约 20:30，桥上视野开阔' },
+      { time: '21:00', text: '沿伊犁河南岸散步', note: '河边步道灯光亮起，夜景很美' },
+      { time: '21:30', text: '汉人街夜市宵夜', note: '回程顺路，烤肉、面肺子、卡瓦斯' },
+      { time: '23:00', text: '返回酒店休息', note: '打车或步行回酒店' },
+    ],
+    hotel: { name: '喀墅·度假美宿', addr: '伊宁市新路街140号', price: '约350-500元/晚' },
+    food: [
+      ['手工冰淇淋', '六星街「亚历山大手工冰淇淋」，奶味浓郁，必打卡，5-10元/个'],
+      ['俄式列巴', '六星街「塔城巴哈利列巴店」，外酥内软，可以买一整个带走'],
+      ['椒麻鸡', '伊宁「老回民椒麻鸡」，解放路老店，麻辣鲜香，半只约40元'],
+      ['薄皮包子', '喀赞其附近「海尔巴格餐厅」，皮薄如纸，羊肉馅汁水丰富'],
+      ['面肺子', '汉人街「马玉素甫面肺子」，伊犁特色，蘸辣酱吃'],
+      ['烤羊蹄', '汉人街夜市人气摊位，胶原蛋白满满，10元/个'],
+      ['卡瓦斯', '汉人街上随处可买，新疆本地发酵饮料，酸甜解腻配烤肉绝了'],
+    ],
+    tips: [
+      ['Citywalk 路线', '喀赞其 → 六星街 → 伊犁河大桥 → 汉人街，全程约 5 公里，边走边逛'],
+      ['喀赞其', '免费开放，坐马车游览约 50 元/人，蓝色房子+彩色木门是最佳拍照点'],
+      ['六星街', '俄式建筑群，傍晚最有氛围，有手风琴表演，适合慢逛'],
+      ['伊犁河大桥', '看日落的绝佳位置，五月日落约 20:30，提前到桥上占位'],
+      ['汉人街', '伊宁最热闹的夜市街，不是只有汉族美食，各民族小吃都有'],
+      ['穿着建议', '傍晚河边风大，带件薄外套'],
+    ],
+  },
+  {
+    day: 'DAY 3', date: '5月3日 周六', title: '伊宁 🚗 那拉提草原',
+    subtitle: '自驾进景区 · 空中草原全天', dist: '自驾约280km', color: COLORS[2],
+    route: ['yining', 'gongliu', 'xinyuan', 'nalati'],
+    schedule: [
+      { time: '09:00', text: '从伊宁出发', note: '走 G218，约 4 小时' },
+      { time: '11:00', text: '途经巩留县', note: '短暂休息、加油补给' },
+      { time: '12:00', text: '途经新源县，午餐', note: '' },
+      { time: '13:00', text: '抵达那拉提景区南门', note: '购买自驾票，开车进入景区' },
+      { time: '13:30', text: '自驾至空中草原入口', note: '景区内自驾约 20 分钟到达' },
+      { time: '13:30', text: '游览空中草原（核心）', note: '徒步+拍照约 2 小时，五月野花初开' },
+      { time: '15:30', text: '空中草原骑马', note: '草原骑马约 1-1.5 小时，沿山坡草甸骑行' },
+      { time: '17:00', text: '自驾沿景区公路返回', note: '沿途随时停车拍照，草原光影绝美' },
+      { time: '18:30', text: '驶出景区，入住酒店', note: '' },
+      { time: '19:30', text: '那拉提镇上晚餐', note: '' },
+    ],
+    hotel: { name: '宿心壹号院', addr: '新疆新源那拉提镇英加尔村天马西街四巷002号', price: '约400-600元/晚' },
+    food: [
+      ['哈萨克毡房手抓肉', '那拉提镇景区大道上的毡房餐厅，大块羊肉蘸盐吃，人均60-80'],
+      ['阿依努尔烤全羊', '那拉提镇上口碑店，提前电话预订，3人可点半只约400元'],
+      ['草原人家奶茶馆', '镇上哈萨克风味小店，咸奶茶+包尔萨克+奶疙瘩，早餐标配'],
+      ['新源县拌面一条街', '路过新源县午餐，县城解放路上拌面馆扎堆，随便进一家都好吃'],
+      ['马肠子/熏马肉', '那拉提特产，镇上小卖部和餐厅都有，可以买真空包装带走'],
+    ],
+    tips: [
+      ['自驾票', '门票 95 元/人 + 自驾票约 200 元/车（含车辆通行费），比坐区间车自由很多'],
+      ['预约方式', '关注"那拉提旅游风景区"微信公众号 → 门票预约 → 选择自驾游览，五一建议提前 1-2 天预约'],
+      ['空中草原', '海拔约 2000m，是那拉提的精华，五月草地返青+野花初开，带件外套防风'],
+      ['自驾路线', '南门进 → 沿景区公路直行 → 空中草原停车场 → 徒步游览 → 原路返回'],
+      ['拍照时间', '下午 16-18 点光线最佳，草原呈金色，逆光拍人像绝了'],
+      ['骑马推荐', '空中草原是全程最佳骑马点，草原开阔视野好，马队成熟安全'],
+      ['骑马价格', '短线约 100-150 元/人（30分钟），长线约 200-300 元/人（1小时+），可砍价'],
+      ['骑马tips', '选牧民自家的马比景区官方便宜，到了草原上会有牧民主动招呼；穿长裤和平底鞋，不要穿裙子'],
+      ['注意事项', '景区内限速 30km/h，弯道多注意安全；草原上不要踩踏围栏内的草地'],
+    ],
+  },
+  {
+    day: 'DAY 4', date: '5月4日 周日', title: '那拉提 → 恰布其海 → 库尔德宁',
+    subtitle: '河谷草原 · 恰布其海水库', dist: '自驾约190km', color: COLORS[3],
+    route: ['nalati', 'chabuqihai', 'kuerdening'],
+    schedule: [
+      { time: '09:30', text: '再次进入那拉提景区', note: '上午游览河谷草原线' },
+      { time: '10:00', text: '游览河谷草原', note: '区间车 40 元/人，约 2-3 小时' },
+      { time: '13:00', text: '午餐', note: '那拉提镇上解决' },
+      { time: '14:00', text: '出发前往恰布其海水库', note: '约 90 公里，1.5 小时' },
+      { time: '15:30', text: '游览恰布其海水库', note: '免费，湖边拍照约 1-1.5 小时' },
+      { time: '17:00', text: '出发前往库尔德宁', note: '约 100 公里，2 小时' },
+      { time: '19:00', text: '入住库尔德宁云杉酒店', note: '' },
+    ],
+    hotel: { name: '库尔德宁云杉酒店', addr: '新疆巩留库尔德宁派出所东南100米', price: '约300-450元/晚' },
+    food: [
+      ['巩留老酸奶', '库尔德宁镇上「牧民酸奶坊」，手工制作，浓稠醇厚，5元/碗'],
+      ['羊肉汤', '镇上「哈力木别克羊肉汤馆」，高山牧场羊肉，汤鲜肉嫩，25元/碗'],
+      ['馕坑肉', '「阿不都热合曼馕坑肉」，馕坑烤制大块羊肉，外焦里嫩，人均50'],
+      ['那拉提镇午餐', '出发前在那拉提镇「天马美食城」解决，拌面、抓饭都有'],
+    ],
+    tips: [
+      ['恰布其海', '免费景点，湖水碧蓝，五月水位较高，适合拍倒影'],
+      ['河谷草原', '比空中草原海拔低，更平缓舒适，适合慢走'],
+      ['路况', '那拉提到库尔德宁走省道，弯道多注意车速'],
+    ],
+  },
+  {
+    day: 'DAY 5', date: '5月5日 周一', title: '库尔德宁 → 八卦城 → 伊宁',
+    subtitle: '云杉林徒步 · 特克斯八卦城', dist: '自驾约300km', color: COLORS[4],
+    route: ['kuerdening', 'tekesi', 'yining'],
+    schedule: [
+      { time: '08:30', text: '早起，进入库尔德宁景区', note: '门票约 60 元 + 区间车 48 元，趁早人少' },
+      { time: '09:00', text: '游览库尔德宁', note: '云杉林徒步，全程约 4-5 小时，慢慢走很治愈' },
+      { time: '09:00', text: '喀班巴依雪峰观景台', note: '区间车终点站，远眺雪山+云杉林，必打卡' },
+      { time: '11:00', text: '沿栈道徒步返回', note: '穿越原始云杉林，空气清新到上瘾' },
+      { time: '13:00', text: '出景区，午餐', note: '镇上解决' },
+      { time: '14:00', text: '出发前往特克斯', note: '库尔德宁 → 特克斯约 90 公里，1.5 小时' },
+      { time: '15:30', text: '抵达特克斯八卦城（可选）', note: '' },
+      { time: '15:30', text: '游览八卦城', note: '观光塔 + 离街，约 1.5-2 小时' },
+      { time: '17:30', text: '出发返回伊宁', note: '特克斯 → 伊宁约 120 公里，2 小时' },
+      { time: '19:30', text: '入住伊宁梵境民宿', note: '' },
+      { time: '20:00', text: '晚餐：汉人街夜市', note: '伊宁最热闹的夜市' },
+    ],
+    hotel: { name: '梵境民宿', addr: '伊宁市喀赞其民俗村内新路街一巷19号', price: '约280-400元/晚' },
+    food: [
+      ['汉人街夜市', '伊宁最热闹的夜市，推荐从新华东路入口进，一路吃到底'],
+      ['面肺子', '汉人街「马玉素甫面肺子」，面粉灌入羊肺蒸制，蘸辣酱吃'],
+      ['烤羊蹄', '汉人街「老马烤羊蹄」，夜市人气王，胶原蛋白满满，10元/个'],
+      ['卡瓦斯', '汉人街「伊犁老卡瓦斯」，新疆本地发酵饮料，酸甜解腻'],
+      ['特克斯午餐', '八卦城离街上「阿力木江抓饭」，羊肉抓饭油香四溢，人均30'],
+    ],
+    tips: [
+      ['库尔德宁', '世界自然遗产地，雪岭云杉原始森林，五月绿意盎然，建议早去人少'],
+      ['徒步路线', '区间车到终点站 → 喀班巴依雪峰观景台拍照 → 沿栈道徒步返回，全程约 8 公里'],
+      ['八卦城', '全国唯一没有红绿灯的城市，登观光塔俯瞰八卦布局（30元）'],
+      ['离街', '特克斯的文创步行街，适合逛吃拍照'],
+    ],
+  },
+  {
+    day: 'DAY 6', date: '5月6日 周二', title: '伊宁 🚗 赛里木湖',
+    subtitle: '自驾环湖 · 湖边日落', dist: '自驾约170km', color: COLORS[5],
+    route: ['yining', 'sayram'],
+    schedule: [
+      { time: '09:30', text: '从伊宁出发', note: '走 G30 连霍高速，约 2.5 小时' },
+      { time: '12:00', text: '抵达赛里木湖景区', note: '门票约 70 元 + 自驾环湖 150 元/车' },
+      { time: '12:30', text: '自驾环湖（顺时针）', note: '环湖约 70 公里，含停车拍照约 4-5 小时' },
+      { time: '18:00', text: '选一处湖边草地休息', note: '享受湖边宁静时光' },
+      { time: '20:30', text: '赛里木湖日落', note: '北岸或西岸观赏' },
+      { time: '21:00', text: '入住赛里木湖城际酒店', note: '' },
+    ],
+    hotel: { name: '赛里木湖城际酒店', addr: '博乐市赛里木湖景区南门附近', price: '约400-600元/晚' },
+    food: [
+      ['高白鲑鱼', '赛里木湖景区南门「赛湖渔庄」，冷水鱼清蒸或烤制都鲜美，人均80-100'],
+      ['博乐手抓饭', '景区附近「木合塔尔手抓饭」，胡萝卜羊肉焖饭，油香四溢，25元/份'],
+      ['自带零食', '环湖途中补给少，建议在伊宁出发前买好馕、水果和热水'],
+    ],
+    tips: [
+      ['环湖路线', '顺时针走，南门进 → 东岸 → 北岸 → 西岸，西岸日落最美'],
+      ['最佳拍照点', '东岸「月亮湾」、北岸「天鹅乐水」、西岸日落观景台'],
+      ['日落时间', '五月日落约 20:30-21:00，提前选好位置'],
+      ['注意', '湖边风大温度低，带好冲锋衣和围巾'],
+    ],
+  },
+  {
+    day: 'DAY 7', date: '5月7日 周三', title: '赛里木湖 → 博乐机场 ✈',
+    subtitle: 'EU2286 16:15 博乐→吐鲁番 · KN5652 转机回京', dist: '自驾约100km', color: COLORS[6],
+    route: ['sayram', 'bole'],
+    schedule: [
+      { time: '06:00', text: '起床，驱车前往东岸观景台', note: '酒店到东岸约 15-20 分钟车程，天还黑要注意路况' },
+      { time: '06:30', text: '抵达东岸观景台/月亮湾', note: '占好位置，架好手机，等日出' },
+      { time: '07:00', text: '赛里木湖日出', note: '五月日出约 7:00-7:30，太阳从东岸雪山后升起，湖面金光' },
+      { time: '07:30', text: '日出后沿湖边散步', note: '晨光下的赛湖最安静，拍照绝佳时段' },
+      { time: '08:30', text: '返回酒店', note: '' },
+      { time: '09:00', text: '酒店早餐、收拾行李', note: '不用赶，慢慢来' },
+      { time: '10:00', text: '退房，湖边再逛逛', note: '上午的赛湖光线柔和，适合补拍' },
+      { time: '11:30', text: '出发前往博乐机场', note: '约 100 公里，1.5 小时，沿途风景也不错' },
+      { time: '13:00', text: '途中可在博乐市区午餐', note: '顺路吃一顿再去机场' },
+      { time: '14:00', text: '抵达博乐机场', note: '博乐阿拉山口机场（BPL）' },
+      { time: '16:15', text: 'EU2286 博乐 → 吐鲁番', note: '提前 1.5 小时到机场即可' },
+      { time: '转机', text: 'KN5652 吐鲁番 → 北京', note: '吐鲁番转机，注意预留转机时间' },
+    ],
+    hotel: null,
+    food: [
+      ['酒店早餐', '退房前享用，赛湖城际酒店自助早餐还不错'],
+      ['提前吃饱', '博乐机场很小，餐饮选择少，建议在酒店吃好或路上买馕垫肚子'],
+    ],
+    tips: [
+      ['日出时间', '五月赛里木湖日出约 7:00-7:30（新疆时间），建议 6:30 前到位'],
+      ['最佳日出点', '东岸观景台或月亮湾，太阳从东侧雪山后升起，湖面会被染成金色'],
+      ['穿衣提醒', '清晨湖边温度只有 0-5°C，务必穿冲锋衣+抓绒，戴帽子手套'],
+      ['拍摄建议', '带三脚架拍延时最佳，手机开 HDR 模式也能出片'],
+      ['机场', '博乐机场较小，提前 1.5 小时到即可'],
+      ['转机提醒', 'EU2286 博乐→吐鲁番，KN5652 吐鲁番→北京，注意两段航班衔接时间'],
+    ],
+  },
+];
+
+
+// ── 初始化地图 ──
+const map = L.map('map', {
+  center: [43.6, 82.5],
+  zoom: 7.5,
+  zoomControl: false,
+});
+
+L.control.zoom({ position: 'topright' }).addTo(map);
+
+// 高德地图瓦片（国内访问快速稳定）
+L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+  attribution: '© 高德地图',
+  maxZoom: 18,
+  subdomains: '1234',
+}).addTo(map);
+
+// ── 真实公路路线坐标（沿实际道路走向的关键拐点）──
+
+const realRoutes = {
+  // DAY1: 机场 → 酒店(民街) → 国际大巴扎
+  day1_city: [
+    [43.9072, 87.4742], // 地窝堡机场
+    [43.8900, 87.4900],
+    [43.8750, 87.5200],
+    [43.8600, 87.5500],
+    [43.8450, 87.5800],
+    [43.8350, 87.6000],
+    [43.8256, 87.6168], // 酒店(天山区龙泉街)
+    [43.8220, 87.6130],
+    [43.8180, 87.6100],
+    [43.8130, 87.6050], // 国际大巴扎
+  ],
+
+  // DAY2: 乌鲁木齐 → 伊宁（高铁沿线，经天山隧道）
+  day2_train: [
+    [43.8256, 87.6168], // 乌鲁木齐
+    [43.9500, 87.3000],
+    [44.0500, 86.8000],
+    [44.1200, 86.0000],
+    [44.2000, 85.2000], // 奎屯方向
+    [44.2500, 84.8000],
+    [44.3000, 84.3000], // 精河
+    [44.4000, 83.5000],
+    [44.3500, 82.8000],
+    [44.2000, 82.2000],
+    [44.0500, 81.8000],
+    [43.9128, 81.3298], // 伊宁
+  ],
+
+  // DAY3: 伊宁 → 巩留 → 新源 → 那拉提（G218国道）
+  day3_drive: [
+    [43.9128, 81.3298], // 伊宁
+    [43.8800, 81.4500],
+    [43.8200, 81.6500],
+    [43.7500, 81.8500],
+    [43.6800, 82.0000],
+    [43.5800, 82.1000],
+    [43.4836, 82.2316], // 巩留县
+    [43.4500, 82.4000],
+    [43.4200, 82.6000],
+    [43.4100, 82.8000],
+    [43.4200, 83.0000],
+    [43.4331, 83.2608], // 新源县
+    [43.4200, 83.4000],
+    [43.4000, 83.5500],
+    [43.3800, 83.7000],
+    [43.3500, 83.8500],
+    [43.3167, 84.0167], // 那拉提
+  ],
+
+  // DAY4: 那拉提 → 恰布其海 → 库尔德宁
+  day4_drive_1: [ // 那拉提 → 恰布其海
+    [43.3167, 84.0167], // 那拉提
+    [43.3300, 83.8500],
+    [43.3400, 83.7000],
+    [43.3500, 83.5000],
+    [43.3600, 83.3000],
+    [43.3700, 83.1000],
+    [43.3500, 82.9000], // 恰布其海
+  ],
+  day4_drive_2: [ // 恰布其海 → 库尔德宁
+    [43.3500, 82.9000], // 恰布其海
+    [43.3300, 82.8500],
+    [43.3000, 82.8000],
+    [43.2700, 82.7500],
+    [43.2300, 82.7000],
+    [43.2000, 82.6500],
+    [43.1667, 82.6000], // 库尔德宁
+  ],
+
+  // DAY5: 库尔德宁 → 特克斯 → 伊宁
+  day5_drive_1: [ // 库尔德宁 → 特克斯
+    [43.1667, 82.6000], // 库尔德宁
+    [43.1500, 82.5000],
+    [43.1400, 82.3500],
+    [43.1500, 82.2000],
+    [43.1800, 82.0500],
+    [43.2000, 81.9500],
+    [43.2181, 81.8369], // 特克斯
+  ],
+  day5_drive_2: [ // 特克斯 → 伊宁
+    [43.2181, 81.8369], // 特克斯
+    [43.2800, 81.7500],
+    [43.3500, 81.6500],
+    [43.4200, 81.5500],
+    [43.5000, 81.5000],
+    [43.5800, 81.4500],
+    [43.6500, 81.4000],
+    [43.7200, 81.3800],
+    [43.8000, 81.3500],
+    [43.8600, 81.3400],
+    [43.9128, 81.3298], // 伊宁
+  ],
+
+  // DAY6: 伊宁 → 赛里木湖（G30连霍高速）
+  day6_drive: [
+    [43.9128, 81.3298], // 伊宁
+    [43.9500, 81.2500],
+    [44.0000, 81.2000],
+    [44.0800, 81.1500],
+    [44.1500, 81.1200],
+    [44.2200, 81.1000],
+    [44.3000, 81.0800],
+    [44.3800, 81.0800],
+    [44.4500, 81.1000],
+    [44.5200, 81.1200],
+    [44.6000, 81.1700], // 赛里木湖
+  ],
+
+  // DAY7: 赛里木湖 → 博乐机场（G30）
+  day7_drive: [
+    [44.6000, 81.1700], // 赛里木湖
+    [44.6200, 81.2500],
+    [44.6500, 81.4000],
+    [44.6800, 81.5500],
+    [44.7200, 81.7000],
+    [44.7500, 81.8000],
+    [44.8000, 81.9000],
+    [44.8500, 82.0000],
+    [44.8955, 82.0667], // 博乐机场
+  ],
+
+  // 飞行弧线：北京 → 乌鲁木齐
+  fly_bj_urumqi: (function() {
+    const pts = [];
+    const startLat = 39.9042, startLng = 116.4074;
+    const endLat = 43.9072, endLng = 87.4742;
+    for (let i = 0; i <= 50; i++) {
+      const t = i / 50;
+      const lat = startLat + (endLat - startLat) * t;
+      const lng = startLng + (endLng - startLng) * t;
+      // 弧线：中间抬高
+      const arc = Math.sin(t * Math.PI) * 3;
+      pts.push([lat + arc, lng]);
+    }
+    return pts;
+  })(),
+};
+
+// 每天对应的路线段
+const dayRouteSegments = [
+  // DAY 1: 飞行 + 市内
+  { fly: 'fly_bj_urumqi', drive: ['day1_city'] },
+  // DAY 2: 高铁
+  { train: 'day2_train', drive: [] },
+  // DAY 3: 自驾
+  { drive: ['day3_drive'] },
+  // DAY 4: 自驾两段
+  { drive: ['day4_drive_1', 'day4_drive_2'] },
+  // DAY 5: 自驾两段
+  { drive: ['day5_drive_1', 'day5_drive_2'] },
+  // DAY 6: 自驾
+  { drive: ['day6_drive'] },
+  // DAY 7: 自驾
+  { drive: ['day7_drive'] },
+];
+
+// 存储图层
+let routeLayers = [];
+let markerLayers = [];
+let labelLayers = [];
+let currentDay = -1;
+
+// ── 创建标记 ──
+function createMarker(latlng, color, isActive, name) {
+  const size = isActive ? 14 : 10;
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="width:${size}px;height:${size}px;background:${color};border:3px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2],
+  });
+  const m = L.marker(latlng, { icon });
+  if (name) m.bindTooltip(name, { permanent: false, direction: 'top' });
+  return m;
+}
+
+function createLabel(latlng, name, isActive) {
+  return L.marker(latlng, {
+    icon: L.divIcon({
+      className: `city-label ${isActive ? 'city-label-active' : ''}`,
+      html: name,
+      iconSize: [80, 20],
+      iconAnchor: [40, -10],
+    }),
+  });
+}
+
+// ── 绘制路线 ──
+function drawPolyline(coords, color, dashed, weight) {
+  return L.polyline(coords, {
+    color: color,
+    weight: weight || (dashed ? 3 : 4),
+    opacity: 0.85,
+    dashArray: dashed ? '10 8' : null,
+    smoothFactor: 1,
+    lineJoin: 'round',
+  });
+}
+
+// ── 清除图层 ──
+function clearLayers() {
+  routeLayers.forEach(l => map.removeLayer(l));
+  markerLayers.forEach(l => map.removeLayer(l));
+  labelLayers.forEach(l => map.removeLayer(l));
+  routeLayers = [];
+  markerLayers = [];
+  labelLayers = [];
+}
+
+// ── 获取某天所有坐标用于 fitBounds ──
+function getDayBounds(idx) {
+  const seg = dayRouteSegments[idx];
+  let allPts = [];
+  if (seg.fly) allPts = allPts.concat(realRoutes[seg.fly]);
+  if (seg.train) allPts = allPts.concat(realRoutes[seg.train]);
+  if (seg.drive) seg.drive.forEach(k => { allPts = allPts.concat(realRoutes[k]); });
+  return allPts;
+}
+
+// ── 显示某一天 ──
+function showDay(idx) {
+  clearLayers();
+  currentDay = idx;
+  const d = days[idx];
+  const seg = dayRouteSegments[idx];
+  const color = d.color;
+
+  // 飞行弧线
+  if (seg.fly) {
+    const line = drawPolyline(realRoutes[seg.fly], '#999', true, 2);
+    line.addTo(map);
+    routeLayers.push(line);
+    // 起点终点标记
+    const flyPts = realRoutes[seg.fly];
+    const m1 = createMarker(flyPts[0], '#999', true);
+    m1.addTo(map); markerLayers.push(m1);
+    const lb1 = createLabel(flyPts[0], '北京', true);
+    lb1.addTo(map); labelLayers.push(lb1);
+  }
+
+  // 高铁线
+  if (seg.train) {
+    const line = drawPolyline(realRoutes[seg.train], color, true, 3);
+    line.addTo(map);
+    routeLayers.push(line);
+  }
+
+  // 自驾线
+  if (seg.drive) {
+    seg.drive.forEach(k => {
+      const line = drawPolyline(realRoutes[k], color, false, 4);
+      line.addTo(map);
+      routeLayers.push(line);
+    });
+  }
+
+  // 标记途经城市
+  const allKeys = new Set([...(d.trainRoute || []), ...d.route]);
+  if (d.flyFrom) allKeys.add(d.flyFrom);
+  allKeys.forEach(k => {
+    if (k === 'beijing') return; // 已在飞行弧线处标记
+    const c = cities[k];
+    const m = createMarker([c.lat, c.lng], color, true);
+    m.addTo(map); markerLayers.push(m);
+    const lb = createLabel([c.lat, c.lng], c.name, true);
+    lb.addTo(map); labelLayers.push(lb);
+  });
+
+  // 调整视野
+  const bounds = getDayBounds(idx);
+  if (bounds.length > 1) {
+    map.fitBounds(bounds, { padding: [60, 60], maxZoom: 12 });
+  }
+
+  // 更新 tab 样式
+  document.querySelectorAll('.day-tab').forEach((tab, i) => {
+    tab.classList.toggle('active', i === idx);
+    tab.style.background = i === idx ? COLORS[i] : '#fff';
+    tab.style.color = i === idx ? '#fff' : '#666';
+  });
+
+  renderDetail(idx);
+}
+
+// ── 显示全程 ──
+function showAll() {
+  clearLayers();
+  currentDay = -1;
+
+  // 绘制所有路线
+  dayRouteSegments.forEach((seg, i) => {
+    const color = COLORS[i];
+    if (seg.fly) {
+      const line = drawPolyline(realRoutes[seg.fly], '#999', true, 2);
+      line.addTo(map); routeLayers.push(line);
+    }
+    if (seg.train) {
+      const line = drawPolyline(realRoutes[seg.train], color, true, 3);
+      line.addTo(map); routeLayers.push(line);
+    }
+    if (seg.drive) {
+      seg.drive.forEach(k => {
+        const line = drawPolyline(realRoutes[k], color, false, 3);
+        line.addTo(map); routeLayers.push(line);
+      });
+    }
+  });
+
+  // 标记主要城市
+  const mainCities = ['urumqi','yining','nalati','kuerdening','tekesi','sayram','bole'];
+  mainCities.forEach(k => {
+    const c = cities[k];
+    const m = createMarker([c.lat, c.lng], '#3d7a5a', false);
+    m.addTo(map); markerLayers.push(m);
+    const lb = createLabel([c.lat, c.lng], c.name, false);
+    lb.addTo(map); labelLayers.push(lb);
+  });
+
+  map.fitBounds(mainCities.map(k => [cities[k].lat, cities[k].lng]), { padding: [60, 60] });
+
+  document.querySelectorAll('.day-tab').forEach(tab => {
+    tab.classList.remove('active');
+    tab.style.background = '#fff';
+    tab.style.color = '#666';
+  });
+
+  renderAllDetail();
+}
+
+// ── 渲染详情面板 ──
+function renderDetail(idx) {
+  const d = days[idx];
+  let html = `
+    <div class="route-header">
+      <span class="route-badge" style="background:${d.color}">${d.day}</span>
+      <span class="route-title">${d.title}</span>
+    </div>
+    <div class="route-meta">
+      <span>📅 ${d.date}</span>
+      <span>🚗 ${d.dist}</span>
+    </div>
+  `;
+
+  // 时间线
+  html += '<div class="timeline">';
+  d.schedule.forEach(s => {
+    html += `
+      <div class="tl-item">
+        <div class="tl-dot" style="border-color:${d.color}"></div>
+        <div class="tl-time" style="color:${d.color}">${s.time}</div>
+        <div class="tl-text">${s.text}</div>
+        ${s.note ? `<div class="tl-note">${s.note}</div>` : ''}
+      </div>`;
+  });
+  html += '</div>';
+
+  // 住宿
+  if (d.hotel) {
+    html += `
+      <div class="info-card hotel">
+        <h4>🏨 住宿：${d.hotel.name}</h4>
+        <p>📍 ${d.hotel.addr}</p>
+        <p>💰 ${d.hotel.price}</p>
+      </div>`;
+  }
+
+  // 美食
+  if (d.food && d.food.length) {
+    html += `<div class="info-card food"><h4>🍽️ 当地美食推荐</h4><ul>`;
+    d.food.forEach(([name, desc]) => {
+      html += `<li><strong>${name}</strong>：${desc}</li>`;
+    });
+    html += '</ul></div>';
+  }
+
+  // 攻略
+  if (d.tips && d.tips.length) {
+    html += `<div class="info-card tips"><h4>📋 景点攻略</h4><ul>`;
+    d.tips.forEach(([title, content]) => {
+      html += `<li><strong>${title}</strong>：${content}</li>`;
+    });
+    html += '</ul></div>';
+  }
+
+  document.getElementById('dayDetail').innerHTML = html;
+}
+
+function renderAllDetail() {
+  let html = '<div style="text-align:center;padding:40px 0;color:#999;">';
+  html += '<div style="font-size:40px;margin-bottom:12px;">🗺️</div>';
+  html += '<div style="font-size:15px;font-weight:600;color:#333;margin-bottom:8px;">全程路线总览</div>';
+  html += '<div style="font-size:12px;line-height:1.8;">';
+  html += '乌鲁木齐 → 伊宁 → 那拉提 → 库尔德宁<br>→ 特克斯 → 伊宁 → 赛里木湖 → 博乐<br><br>';
+  html += '自驾总里程约 <strong>950 公里</strong><br>';
+  html += '主要路线：G218 · G30 连霍高速<br><br>';
+  html += '点击上方天数按钮查看每日详情</div></div>';
+  document.getElementById('dayDetail').innerHTML = html;
+}
+
+// ── 初始化 tabs ──
+const tabsEl = document.getElementById('dayTabs');
+days.forEach((d, i) => {
+  const tab = document.createElement('div');
+  tab.className = 'day-tab';
+  tab.textContent = d.day;
+  tab.onclick = () => showDay(i);
+  tabsEl.appendChild(tab);
+});
+
+document.getElementById('btnAll').onclick = showAll;
+
+// 默认显示全程
+showAll();
+</script>
+</body>
+</html>
